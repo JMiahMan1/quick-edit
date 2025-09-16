@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    command: gunicorn --bind 0.0.0.0:5000 --timeout 1800 app:app
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./static/thumbnails:/app/static/thumbnails
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+
+  worker:
+    build: .
+    command: celery -A app.celery worker --loglevel=info
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./static/thumbnails:/app/static/thumbnails
+      - .:/app
+    depends_on:
+      - redis
+      - web

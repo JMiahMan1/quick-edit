@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing Complete</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; color: #333; max-width: 800px; margin: auto; padding: 1rem; }
+        h1, h2 { color: #555; }
+        .container { background: #fff; padding: 2rem; margin-bottom: 1rem; border-radius: 5px; }
+        a.download-btn { display: inline-block; background: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; }
+        ul { list-style: none; padding: 0; }
+        li { margin-bottom: 0.5rem; }
+        /* Style for final status messages */
+        .flashes { list-style: none; padding: 0; }
+        .flashes li { background: #e2e3e5; color: #383d41; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; border-left: 5px solid #818182; }
+    </style>
+</head>
+<body>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class=flashes>
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <h1>Processing Complete! ✅</h1>
+    
+    {% if output_files.video %}
+    <div class="container">
+        <h2>Video Files (MP4)</h2>
+        <ul>
+        {% for file in output_files.video %}
+            <li><a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download {{ file }}</a></li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if output_files.audio %}
+    <div class="container">
+        <h2>Audio Files (MP3)</h2>
+        <ul>
+        {% for file in output_files.audio %}
+            <li><a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download {{ file }}</a></li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if output_files.text %}
+    <div class="container">
+        <h2>Transcription Files (TXT)</h2>
+        <ul>
+        {% for file in output_files.text %}
+            <li><a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download {{ file }}</a></li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    
+    <hr>
+    <a href="/">Process another video</a>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyzing Video...</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { text-align: center; padding: 2rem; background: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #555; }
+        p { color: #777; }
+        .error { color: #c62828; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="status-message">Analyzing Video...</h1>
+        <p>Please wait while we generate thumbnails and find split points.</p>
+    </div>
+
+    <script>
+        const taskId = "{{ task_id }}";
+        const statusMessage = document.getElementById('status-message');
+
+        function pollAnalysisStatus() {
+            const interval = setInterval(() => {
+                fetch(`/status/${taskId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.state === 'PROGRESS') {
+                            statusMessage.textContent = data.status;
+                        } else if (data.state === 'SUCCESS') {
+                            clearInterval(interval);
+                            statusMessage.textContent = 'Analysis Complete! Redirecting...';
+                            // Redirect to the preview page, which is now populated with the results
+                            window.location.href = `/preview/${taskId}`;
+                        } else if (data.state === 'FAILURE') {
+                            clearInterval(interval);
+                            statusMessage.innerHTML = 'Analysis Failed! <br> <span class="error">' + data.status + '</span>';
+                        }
+                    })
+                    .catch(error => {
+                        clearInterval(interval);
+                        statusMessage.textContent = 'Connection Error!';
+                    });
+            }, 2500);
+        }
+
+        // Start polling as soon as the page loads
+        pollAnalysisStatus();
+    </script>
+</body>
+</html>
