@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
@@ -8,7 +6,8 @@ services:
 
   web:
     build: .
-    command: gunicorn --bind 0.0.0.0:5000 --timeout 1800 app:app
+    # --- UPDATE THIS LINE ---
+    command: gunicorn --bind 0.0.0.0:5000 --timeout 3600 --keep-alive 300 app:app
     volumes:
       - ./uploads:/app/uploads:z
       - ./results:/app/results:z
@@ -20,7 +19,7 @@ services:
 
   worker:
     build: .
-    command: celery -A app.celery worker --loglevel=info
+    command: celery -A celery_config.celery worker --loglevel=info
     volumes:
       - ./uploads:/app/uploads:z
       - ./results:/app/results:z
