@@ -5,17 +5,8 @@ from werkzeug.utils import secure_filename
 import json
 import traceback
 from moviepy.editor import VideoFileClip
-from celery import Celery
-# --- CHANGE HERE ---
+from celery_config import celery
 from process_video import start_analysis_task, process_video_segments, process_and_concatenate_segments
-
-# --- Celery Configuration ---
-celery = Celery(
-    'tasks',
-    broker='redis://redis:6379/0',
-    backend='redis://redis:6379/0'
-)
-celery.conf.update(task_track_started=True)
 
 UPLOAD_FOLDER = 'uploads'
 RESULTS_FOLDER = 'results'
@@ -37,7 +28,6 @@ def index():
     if request.method == 'POST':
         sensitivity = int(request.form.get('sensitivity', 80))
         
-        # Handle URL input by starting a background task
         video_url = request.form.get('url')
         if video_url:
             task = start_analysis_task.delay(
@@ -48,7 +38,6 @@ def index():
             )
             return redirect(url_for('analysis_status', task_id=task.id))
 
-        # Handle File Upload by saving the file and starting a background task
         elif 'file' in request.files and request.files['file'].filename != '':
             file = request.files['file']
             if '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS:

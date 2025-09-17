@@ -5,27 +5,17 @@ import os
 import shutil
 import whisper
 import yt_dlp
-from celery import Celery
+from celery_config import celery
 import traceback
-
-# --- Celery Configuration ---
-celery = Celery(
-    'tasks',
-    broker='redis://redis:6379/0',
-    backend='redis://redis:6379/0'
-)
-celery.conf.update(task_track_started=True)
-
 
 # --- Celery Tasks ---
 
 @celery.task(bind=True)
 def start_analysis_task(self, sensitivity, thumbnail_dir, upload_dir, video_path=None, url=None):
     """
-    The new entry point task. Handles download (if URL provided) and then analysis.
+    The main entry point task. Handles download (if URL provided) and then analysis.
     """
     try:
-        # --- Download Logic ---
         if url:
             self.update_state(state='PROGRESS', meta={'status': 'Downloading video...'})
             ydl_opts = { 'format': 'best[ext=mp4]/best', 'outtmpl': os.path.join(upload_dir, '%(title)s.%(ext)s') }
@@ -36,7 +26,6 @@ def start_analysis_task(self, sensitivity, thumbnail_dir, upload_dir, video_path
         if not video_path or not os.path.exists(video_path):
             raise FileNotFoundError("Video file not found after download/upload.")
 
-        # --- Analysis Logic ---
         self.update_state(state='PROGRESS', meta={'status': 'Analyzing video for template match...'})
         
         clip = VideoFileClip(video_path)
@@ -65,11 +54,8 @@ def start_analysis_task(self, sensitivity, thumbnail_dir, upload_dir, video_path
         return {'status': 'Analysis Complete', 'result': result_data}
 
     except Exception as e:
-        # Make sure to set task to failure state with the error message
         self.update_state(state='FAILURE', meta={'status': f'An error occurred: {str(e)}'})
-        # Re-raise the exception so Celery logs it
         raise e
-
 
 @celery.task(bind=True)
 def process_video_segments(self, video_path, jobs, output_dir):
@@ -254,35 +240,38 @@ def transcribe_audio(audio_path):
     except Exception as e:
         print(f"Error during transcription: {e}")
         return "Transcription failed."
-def analyze_video_for_changes(video_path, sensitivity=5):
+
+def analyze_video_for_changes(video_path, sensitivity=80):
     """
-    Analyzes video for the FIRST high-priority template match and stops.
-    If no template match is found, it falls back to finding all general changes.
+    Analyzes video for the first template match by checking one frame every 2 seconds
+    and using fewer features for increased speed.
     """
-    print("Analyzing video for template matches and other changes...")
+    print(f"Analyzing video for template matches with a threshold of {sensitivity} features...")
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         return []
 
     try:
         template = cv2.imread("template.jpg", 0)
+        if template is None:
+            raise FileNotFoundError("template.jpg not found or could not be read.")
+        
+        # Using 1000 features for a balance of speed and accuracy
         orb = cv2.ORB_create(nfeatures=1000)
         kp_template, des_template = orb.detectAndCompute(template, None)
+        
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
-        template_available = True
         print("Template image loaded successfully.")
     except Exception as e:
-        print(f"WARNING: Could not load template image. Error: {e}")
-        template_available = False
+        print(f"FATAL: Could not load template. Error: {e}")
+        return []
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps == 0:
         fps = 30
-
-    cooldown_frames = 2 * int(fps)
-    last_cut_frame = -cooldown_frames
-    frame_history = {}
-    cut_points = []
+    
+    # Analyze one frame every 2 seconds for efficiency
+    frame_skip_interval = int(fps * 2)
     
     frame_num = 0
     while True:
@@ -290,54 +279,29 @@ def analyze_video_for_changes(video_path, sensitivity=5):
         if not ret:
             break
 
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        if frame_num < last_cut_frame + cooldown_frames:
-            frame_num += 1
-            continue
-        
-        # --- MODIFIED LOGIC: Prioritize template match and stop if found ---
-        if template_available:
+        if frame_num % frame_skip_interval == 0:
+            print(f"Analyzing frame at {frame_num / fps:.2f}s...")
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
             kp_frame, des_frame = orb.detectAndCompute(gray_frame, None)
-            if des_frame is not None:
+            if des_frame is not None and len(des_frame) > 0:
                 matches = bf.knnMatch(des_template, des_frame, k=2)
-                good_matches = [m for m_n in matches if len(m_n) == 2 for m, n in [m_n] if m.distance < 0.75 * n.distance]
                 
-                # Using a fixed, high threshold for a "definite" match
-                if len(good_matches) > 80:
+                good_matches = []
+                for match_pair in matches:
+                     if len(match_pair) == 2:
+                        m, n = match_pair
+                        if m.distance < 0.75 * n.distance:
+                            good_matches.append(m)
+
+                if len(good_matches) > sensitivity:
                     timestamp = frame_num / fps
-                    print(f"High-priority template match found at {timestamp:.2f}s with {len(good_matches)} features. Stopping analysis.")
-                    cut_points.append(timestamp)
-                    break # <-- STOPS THE LOOP
-
-        # This part only runs if no template match was found in the frame
-        current_hist = cv2.calcHist([frame], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
-        cv2.normalize(current_hist, current_hist).flatten()
-        current_brightness = np.mean(gray_frame)
-        
-        frame_history[frame_num] = {'brightness': current_brightness, 'hist': current_hist}
-        
-        past_frame_num = frame_num - int(fps)
-        if past_frame_num in frame_history:
-            last_frame_data = frame_history[past_frame_num]
-            
-            brightness_diff = current_brightness - last_frame_data['brightness']
-            scene_diff = cv2.compareHist(current_hist, last_frame_data['hist'], cv2.HISTCMP_CHISQR_ALT)
-            
-            norm_brightness_score = min(brightness_diff / 50.0, 1.0) if brightness_diff > 0 else 0
-            norm_scene_score = min(scene_diff / 1.0, 1.0)
-            
-            combined_score = (norm_brightness_score * 0.4) + (norm_scene_score * 0.6)
-            final_rating = int(round(combined_score * 10))
-
-            if final_rating >= sensitivity:
-                timestamp = frame_num / fps
-                print(f"General change detected at {timestamp:.2f}s. (Rating: {final_rating}/10)")
-                cut_points.append(timestamp)
-                last_cut_frame = frame_num
+                    print(f"Match found at {timestamp:.2f}s with {len(good_matches)} features (Threshold: {sensitivity}).")
+                    cap.release()
+                    return [timestamp]
 
         frame_num += 1
 
     cap.release()
-    print(f"Analysis complete. Found {len(cut_points)} total change events.")
-    return sorted(list(set(cut_points)))
+    print(f"Analysis complete. No match found exceeding the threshold of {sensitivity} features.")
+    return []

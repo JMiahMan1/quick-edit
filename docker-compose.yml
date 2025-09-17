@@ -10,9 +10,9 @@ services:
     build: .
     command: gunicorn --bind 0.0.0.0:5000 --timeout 1800 app:app
     volumes:
-      - ./uploads:/app/uploads
-      - ./results:/app/results
-      - ./static/thumbnails:/app/static/thumbnails
+      - ./uploads:/app/uploads:z
+      - ./results:/app/results:z
+      - ./static/thumbnails:/app/static/thumbnails:z
     ports:
       - "5000:5000"
     depends_on:
@@ -22,10 +22,10 @@ services:
     build: .
     command: celery -A app.celery worker --loglevel=info
     volumes:
-      - ./uploads:/app/uploads
-      - ./results:/app/results
-      - ./static/thumbnails:/app/static/thumbnails
-      - .:/app
+      - ./uploads:/app/uploads:z
+      - ./results:/app/results:z
+      - ./static/thumbnails:/app/static/thumbnails:z
+      - .:/app:z
     depends_on:
       - redis
       - web
