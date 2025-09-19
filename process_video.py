@@ -11,11 +11,13 @@ import traceback
 # --- Celery Tasks ---
 
 @celery.task(bind=True)
-def start_analysis_task(self, sensitivity, thumbnail_dir, upload_dir, video_path=None, url=None):
+def start_analysis_task(self, sensitivity, thumbnail_dir, upload_dir, video_path=None, url=None, youtube_video_id=None):
     """
-    The main entry point task. Handles download (if URL provided) and then analysis.
+    The main entry point task. Handles download and analysis, passing the video_id through.
     """
     try:
+        original_url = url 
+
         if url:
             self.update_state(state='PROGRESS', meta={'status': 'Downloading video...'})
             ydl_opts = { 'format': 'best[ext=mp4]/best', 'outtmpl': os.path.join(upload_dir, '%(title)s.%(ext)s') }
@@ -46,9 +48,13 @@ def start_analysis_task(self, sensitivity, thumbnail_dir, upload_dir, video_path
                 segments.append({
                     "index": i, "start": start, "end": end, "thumbnail": thumbnail_url
                 })
-
+        
         result_data = {
-            'video_path': video_path, 'video_duration': video_duration, 'segments': segments
+            'video_path': video_path, 
+            'video_duration': video_duration, 
+            'segments': segments,
+            'original_url': original_url,
+            'youtube_video_id': youtube_video_id
         }
         
         return {'status': 'Analysis Complete', 'result': result_data}
@@ -243,10 +249,10 @@ def transcribe_audio(audio_path):
 
 def analyze_video_for_changes(video_path, sensitivity=80):
     """
-    Analyzes video for the first template match by checking one frame every 2 seconds
-    and using fewer features for increased speed.
+    Analyzes video to find the FIRST scene that matches the template.jpg
+    with a feature count greater than the sensitivity threshold, then stops.
     """
-    print(f"Analyzing video for template matches with a threshold of {sensitivity} features...")
+    print(f"Analyzing video for first template match > {sensitivity} features...")
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         return []
@@ -256,8 +262,7 @@ def analyze_video_for_changes(video_path, sensitivity=80):
         if template is None:
             raise FileNotFoundError("template.jpg not found or could not be read.")
         
-        # Using 1000 features for a balance of speed and accuracy
-        orb = cv2.ORB_create(nfeatures=1000)
+        orb = cv2.ORB_create(nfeatures=2000)
         kp_template, des_template = orb.detectAndCompute(template, None)
         
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
@@ -270,16 +275,16 @@ def analyze_video_for_changes(video_path, sensitivity=80):
     if fps == 0:
         fps = 30
     
-    # Analyze one frame every 2 seconds for efficiency
-    frame_skip_interval = int(fps * 2)
-    
+    cut_points = []
     frame_num = 0
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        if frame_num % frame_skip_interval == 0:
+        # Analyze one frame per second for efficiency
+        if frame_num % int(fps) == 0:
             print(f"Analyzing frame at {frame_num / fps:.2f}s...")
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
@@ -297,11 +302,11 @@ def analyze_video_for_changes(video_path, sensitivity=80):
                 if len(good_matches) > sensitivity:
                     timestamp = frame_num / fps
                     print(f"Match found at {timestamp:.2f}s with {len(good_matches)} features (Threshold: {sensitivity}).")
-                    cap.release()
-                    return [timestamp]
+                    cut_points.append(timestamp)
+                    break # Stop searching after the first match
 
         frame_num += 1
 
     cap.release()
-    print(f"Analysis complete. No match found exceeding the threshold of {sensitivity} features.")
-    return []
+    print(f"Analysis complete. Found {len(cut_points)} template match(es).")
+    return cut_points

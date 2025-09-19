@@ -7,7 +7,7 @@ services:
   web:
     build: .
     # --- UPDATE THIS LINE ---
-    command: gunicorn --bind 0.0.0.0:5000 --timeout 3600 --keep-alive 300 app:app
+    command: gunicorn --worker-class gevent --bind 0.0.0.0:5000 --timeout 1800 --log-level debug app:app
     volumes:
       - ./uploads:/app/uploads:z
       - ./results:/app/results:z
@@ -19,12 +19,13 @@ services:
 
   worker:
     build: .
-    command: celery -A celery_config.celery worker --loglevel=info
+    command: celery -A celery_config.celery worker --loglevel=info --concurrency=1
     volumes:
       - ./uploads:/app/uploads:z
       - ./results:/app/results:z
       - ./static/thumbnails:/app/static/thumbnails:z
       - .:/app:z
+      - ./config:/app/config:z
     depends_on:
       - redis
       - web

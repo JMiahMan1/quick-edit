@@ -5,64 +5,132 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Processing Complete</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; color: #333; max-width: 800px; margin: auto; padding: 1rem; }
+        :root {
+            --light-gray: #f8f9fa;
+            --border-color: #dee2e6;
+            --text-color: #343a40;
+            --card-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+        }
+        .main-container { max-width: 900px; margin: auto; }
         h1, h2 { color: #555; }
-        .container { background: #fff; padding: 2rem; margin-bottom: 1rem; border-radius: 5px; }
+        h1 { text-align: center; }
+        .card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+        .card-header { background-color: var(--light-gray); padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .card-header h2 { margin: 0; font-size: 1.2rem; }
+        .card-body { padding: 1.5rem; }
+        
+        .result-item { margin-bottom: 2rem; }
+        .result-item h3 { margin-top: 0; }
+        
+        video, audio { width: 100%; border-radius: 4px; margin-bottom: 1rem; }
+        .transcript-preview {
+            background-color: #e9ecef;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap; /* Allows text to wrap */
+            margin-bottom: 1rem;
+        }
+        
         a.download-btn { display: inline-block; background: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; }
-        ul { list-style: none; padding: 0; }
-        li { margin-bottom: 0.5rem; }
-        /* Style for final status messages */
-        .flashes { list-style: none; padding: 0; }
-        .flashes li { background: #e2e3e5; color: #383d41; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; border-left: 5px solid #818182; }
     </style>
 </head>
 <body>
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul class=flashes>
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
-
-    <h1>Processing Complete! ✅</h1>
+    <div class="main-container">
+        <h1>Processing Complete! ✅</h1>
     
-    {% if output_files.video %}
-    <div class="container">
-        <h2>Video Files (MP4)</h2>
-        <ul>
-        {% for file in output_files.video %}
-            <li><a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download {{ file }}</a></li>
-        {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
+        {% if output_files.video %}
+        <div class="card">
+            <div class="card-header"><h2>Video Previews (MP4)</h2></div>
+            <div class="card-body">
+                {% for file in output_files.video %}
+                <div class="result-item">
+                    <h3>{{ file }}</h3>
+                    <video controls preload="metadata">
+                        <source src="{{ url_for('download_file', filename=file) }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download MP4</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
-    {% if output_files.audio %}
-    <div class="container">
-        <h2>Audio Files (MP3)</h2>
-        <ul>
-        {% for file in output_files.audio %}
-            <li><a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download {{ file }}</a></li>
-        {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
+        {% if output_files.audio %}
+        <div class="card">
+            <div class="card-header"><h2>Audio Previews (MP3)</h2></div>
+            <div class="card-body">
+                {% for file in output_files.audio %}
+                <div class="result-item">
+                    <h3>{{ file }}</h3>
+                    <audio controls preload="metadata">
+                        <source src="{{ url_for('download_file', filename=file) }}" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download MP3</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
-    {% if output_files.text %}
-    <div class="container">
-        <h2>Transcription Files (TXT)</h2>
-        <ul>
-        {% for file in output_files.text %}
-            <li><a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download {{ file }}</a></li>
-        {% endfor %}
-        </ul>
+        {% if output_files.text %}
+        <div class="card">
+            <div class="card-header"><h2>Transcription Previews (TXT)</h2></div>
+            <div class="card-body">
+                {% for file in output_files.text %}
+                <div class="result-item">
+                    <h3>{{ file }}</h3>
+                    <pre class="transcript-preview" id="transcript-{{ loop.index0 }}">Loading transcript...</pre>
+                    <a href="{{ url_for('download_file', filename=file) }}" class="download-btn">Download TXT</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <div style="text-align:center;">
+            <a href="/" class="btn btn-primary" style="background-color: var(--primary-color);">Process Another Video</a>
+        </div>
     </div>
-    {% endif %}
-    
-    <hr>
-    <a href="/">Process another video</a>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const textFiles = {{ output_files.text|tojson }};
+            if (textFiles) {
+                textFiles.forEach((file, index) => {
+                    const previewElement = document.getElementById(`transcript-${index}`);
+                    if (previewElement) {
+                        fetch(`{{ url_for('download_file', filename='') }}${file}`)
+                            .then(response => response.text())
+                            .then(text => {
+                                previewElement.textContent = text;
+                            })
+                            .catch(err => {
+                                previewElement.textContent = 'Error loading transcript.';
+                                console.error('Error fetching transcript:', err);
+                            });
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

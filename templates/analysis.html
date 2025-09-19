@@ -14,18 +14,25 @@
 </head>
 <body>
     <div class="container">
-        <h1 id="status-message">Starting...</h1>
-        <p>Please wait while we download and analyze your video.</p>
+        <h1 id="status-message">Analyzing Video...</h1>
+        <p>Please wait while we generate thumbnails and find split points.</p>
     </div>
 
     <script>
         const taskId = "{{ task_id }}";
         const statusMessage = document.getElementById('status-message');
+        let errorCount = 0; // --- ADDED ---
 
         function pollAnalysisStatus() {
             const interval = setInterval(() => {
                 fetch(`/status/${taskId}`)
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        errorCount = 0; // Reset error count on successful connection
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.state === 'PROGRESS') {
                             statusMessage.textContent = data.status;
@@ -39,10 +46,14 @@
                         }
                     })
                     .catch(error => {
-                        clearInterval(interval);
-                        statusMessage.textContent = 'Connection Error!';
+                        errorCount++;
+                        console.warn(`Connection error count: ${errorCount}`);
+                        if (errorCount > 5) { // Stop after 5 consecutive errors
+                            clearInterval(interval);
+                            statusMessage.textContent = 'Lost connection to the server.';
+                        }
                     });
-            }, 2500);
+            }, 3000); // Poll every 3 seconds
         }
 
         pollAnalysisStatus();

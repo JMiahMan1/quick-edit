@@ -8,3 +8,4 @@ yt-dlp==2025.09.05
 openai-whisper==20250625
 celery==5.4.0
 redis==5.1.1
+gevent==25.9.1

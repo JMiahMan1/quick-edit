@@ -5,64 +5,163 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Preview Splits</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; color: #333; max-width: 800px; margin: auto; padding: 1rem; }
+        body { font-family: sans-serif; background: #f4f4f9; color: #333; max-width: 1000px; margin: auto; padding: 1rem; }
         h1, h2 { color: #555; }
-        form { background: #fff; padding: 2rem; border-radius: 5px; margin-top: 1rem; }
+        form { background: #fff; padding: 2rem; border-radius: 8px; margin-top: 1rem; }
         input[type=submit] { background: #28a745; color: white; padding: 15px 25px; border: none; border-radius: 4px; cursor: pointer; font-size: 1.1rem; width: 100%; }
-        .segment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+       
+        .segment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 11rem; /* Increased by 6rem more - now 11rem total */
+        }
+       
         .segment, .override-segment { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; background: #fff; }
-        .segment img { max-width: 100%; height: auto; border-radius: 4px; }
+       
+        .player-container, .thumbnail-container {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background-color: #000;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .thumbnail-container img { max-height: 100%; max-width: 100%; height: auto; width: auto; border-radius: 4px; }
+       
         .segment-header { font-weight: bold; margin-bottom: 0.5rem; }
         .options label, .concat-option label { display: block; margin-bottom: 0.5rem; }
-        .time-input-group { display: flex; gap: 10px; align-items: center; }
-        .time-input-group input { width: 60px; }
-        .concat-option { margin-top: 1.5rem; padding: 1rem; background-color: #e9ecef; border-radius: 5px; }
-        #loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.8); color: white;
-            display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 1000;
+ 
+        /* FIXED OVERRIDE LAYOUT - Better spacing and positioning */
+        .override {
+            margin-top: 12rem; /* Increased by 6rem more - now 12rem total */
+            margin-bottom: 2rem; /* Added bottom margin for better spacing */
+            padding: 1.5rem; /* Increased padding */
+            background-color: #e9ecef;
+            border-radius: 5px;
+            display: block;
+            clear: both; /* prevents overlap */
+            position: relative; /* Ensure proper positioning context */
+            z-index: 1; /* Ensure it stays on top */
         }
-        #loading-overlay h2 { color: white; font-size: 2rem; }
-        #final-results { margin-top: 2rem; }
-        #final-results a { display: inline-block; background: #28a745; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin: 5px; }
+        
+        .override h2 {
+            margin-top: 0; /* Remove default top margin on h2 inside override */
+            margin-bottom: 1rem;
+        }
+        
+        .time-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 1.5rem; /* Increased margin */
+        }
+        .time-input-group input { width: 60px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .override-split-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem; /* Increased gap */
+            margin-top: 1rem;
+        }
+ 
+        .concat-option { 
+            margin-top: 2rem; /* Increased top margin */
+            margin-bottom: 2rem; /* Added bottom margin */
+            padding: 1.5rem; /* Increased padding */
+            background-color: #e9ecef; 
+            border-radius: 5px; 
+        }
+        
+        /* Loading overlay styles */
+        #loading-overlay { 
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+        }
+        
+        #final-results { 
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        /* Progress bar styles */
+        #progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: #28a745;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-container {
+            width: 300px;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
     <div id="loading-overlay">
-        <div>
-            <h2 id="loading-status">Processing Video...</h2>
-            <p>This may take several minutes. Please do not close this window.</p>
-            <div id="final-results"></div>
+        <div id="loading-status">Processing...</div>
+        <div class="progress-container">
+            <div id="progress-bar"></div>
         </div>
+        <div id="final-results"></div>
     </div>
-
+ 
     <div id="main-content">
-        <h1>Preview & Select Segments 🔍</h1>
-        <p>We analyzed your video and found potential splits. Select which segments you want to process and in what format.</p>
-        
-        <form action="/process" method="post" id="process-form">
-            <input type="hidden" name="video_path" value="{{ video_path }}">
-            <input type="hidden" name="video_duration" value="{{ video_duration }}">
-            <input type="hidden" name="num_segments" value="{{ segments|length }}">
-
-            <h2>Detected Segments</h2>
-            <div class="segment-grid">
-                {% for segment in segments %}
-                <div class="segment">
-                    <input type="hidden" name="segment_{{ segment.index }}_start" value="{{ segment.start }}">
-                    <input type="hidden" name="segment_{{ segment.index }}_end" value="{{ segment.end }}">
-                    <div class="segment-header">
-                        <input type="checkbox" name="segment_{{ segment.index }}_process" id="segment_{{ segment.index }}_process" checked>
-                        <label for="segment_{{ segment.index }}_process">Segment {{ segment.index + 1 }}</label>
-                        <br>({{ "%.2f"|format(segment.start) }}s - {{ "%.2f"|format(segment.end) }}s)
-                    </div>
-                    {% if segment.thumbnail %}
-                        <img src="{{ url_for('static', filename=segment.thumbnail) }}" alt="Thumbnail for segment {{ segment.index + 1 }}">
+        <h1>Preview & Select Segments 🎬</h1>
+       <p>Review the proposed splits. The videos below are cued to the start of each segment.</p>
+     
+       <form action="/process" method="post" id="process-form">
+           <input type="hidden" name="video_path" value="{{ video_path }}">
+           <input type="hidden" name="video_duration" value="{{ video_duration }}">
+           <input type="hidden" name="num_segments" value="{{ segments|length }}">
+ 
+           <h2>Detected Segments</h2>
+           <div class="segment-grid">
+               {% for segment in segments %}
+               <div class="segment">
+                   <input type="hidden" name="segment_{{ segment.index }}_start" value="{{ segment.start }}">
+                   <input type="hidden" name="segment_{{ segment.index }}_end" value="{{ segment.end }}">
+                   <div class="segment-header">
+                       <input type="checkbox" name="segment_{{ segment.index }}_process" id="segment_{{ segment.index }}_process" {% if segment.index == 1 %}checked{% endif %}>
+                       <label for="segment_{{ segment.index }}_process">Segment {{ segment.index + 1 }}</label>
+                       <br>({{ "%.2f"|format(segment.start) }}s - {{ "%.2f"|format(segment.end) }}s)
+                   </div>
+                 
+                   {% if youtube_video_id %}
+                       <div class="player-container" id="player-{{ segment.index }}"></div>
+                   {% elif segment.thumbnail %}
+                       <div class="thumbnail-container">
+                           <img src="{{ url_for('static', filename=segment.thumbnail) }}" alt="Thumbnail for segment {{ segment.index + 1 }}">
+                           <p style="font-size: 0.8em; color: #888;">(Interactive previews only available for YouTube URLs)</p>
+                        </div>
                     {% endif %}
+ 
                     <div class="options">
                         <h4>Output Formats:</h4>
-                        <label><input type="checkbox" name="segment_{{ segment.index }}_format_mp4" checked> Video (MP4)</label>
-                        <label><input type="checkbox" name="segment_{{ segment.index }}_format_mp3" checked> Audio (MP3)</label>
+                        <label><input type="checkbox" name="segment_{{ segment.index }}_format_mp4"> Video (MP4)</label>
+                        <label><input type="checkbox" name="segment_{{ segment.index }}_format_mp3" {% if segment.index == 1 %}checked{% endif %}> Audio (MP3)</label>
                         <label><input type="checkbox" name="segment_{{ segment.index }}_format_txt"> Transcribe (TXT)</label>
                     </div>
                 </div>
@@ -70,61 +169,95 @@
                 <p>No changes found. You can use the manual override below to split the full video.</p>
                 {% endfor %}
             </div>
-            
-            <h2>Manual Override</h2>
-            <p>Or, ignore the above and split the video at one specific time.</p>
-            <div class="time-input-group">
-                <input type="number" name="override_hr" placeholder="HH" min="0"> :
-                <input type="number" name="override_min" placeholder="MM" min="0" max="59"> :
-                <input type="number" name="override_sec" placeholder="SS" min="0" max="59">
-            </div>
-            <br>
-            <div class="segment-grid">
-                <div class="override-segment">
-                    <div class="segment-header">Part 1 (Before Split)</div>
-                    <div class="options">
-                        <label><input type="checkbox" name="override_1_format_mp4"> Video (MP4)</label>
-                        <label><input type="checkbox" name="override_1_format_mp3"> Audio (MP3)</label>
-                        <label><input type="checkbox" name="override_1_format_txt"> Transcribe (TXT)</label>
+ 
+            <!-- FIXED MANUAL OVERRIDE - Now with proper spacing -->
+            <div class="override">
+                <h2>Manual Override</h2>
+                <p>Or, ignore the above and split the video at one specific time.</p>
+ 
+                <div class="time-input-group">
+                    <input type="number" name="override_hr" placeholder="HH" min="0"> :
+                    <input type="number" name="override_min" placeholder="MM" min="0" max="59"> :
+                    <input type="number" name="override_sec" placeholder="SS" min="0" max="59">
+                </div>
+ 
+                <div class="override-split-grid">
+                    <div class="override-segment">
+                        <div class="segment-header">Part 1 (Before Split)</div>
+                        <div class="options">
+                            <label><input type="checkbox" name="override_1_format_mp4"> Video (MP4)</label>
+                            <label><input type="checkbox" name="override_1_format_mp3"> Audio (MP3)</label>
+                            <label><input type="checkbox" name="override_1_format_txt"> Transcribe (TXT)</label>
+                        </div>
+                    </div>
+ 
+                    <div class="override-segment">
+                        <div class="segment-header">Part 2 (After Split)</div>
+                        <div class="options">
+                            <label><input type="checkbox" name="override_2_format_mp4"> Video (MP4)</label>
+                            <label><input type="checkbox" name="override_2_format_mp3"> Audio (MP3)</label>
+                            <label><input type="checkbox" name="override_2_format_txt"> Transcribe (TXT)</label>
+                        </div>
                     </div>
                 </div>
-                <div class="override-segment">
-                    <div class="segment-header">Part 2 (After Split)</div>
-                    <div class="options">
-                        <label><input type="checkbox" name="override_2_format_mp4"> Video (MP4)</label>
-                        <label><input type="checkbox" name="override_2_format_mp3"> Audio (MP3)</label>
-                        <label><input type="checkbox" name="override_2_format_txt"> Transcribe (TXT)</label>
-                    </div>
-                </div>
             </div>
-
+ 
             <div class="concat-option">
                 <label>
                     <input type="checkbox" name="concatenate_segments">
                     <strong>Combine all selected segments into a single file</strong>
                 </label>
             </div>
-            
+ 
             <br>
             <input type="submit" value="Process Selected Segments">
         </form>
     </div>
-
+ 
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
+        const segments = {{ segments|tojson }};
+        const youtubeVideoId = {{ youtube_video_id|tojson }};
+        const players = [];
+ 
+        function onYouTubeIframeAPIReady() {
+            if (youtubeVideoId && segments) {
+               segments.forEach(segment => {
+                   const player = new YT.Player('player-' + segment.index, {
+                       height: '90%',
+                       width: '100%',
+                       videoId: youtubeVideoId,
+                       playerVars: {
+                           'playsinline': 1,
+                           'start': Math.floor(segment.start)
+                       }
+                   });
+                    players.push(player);
+                });
+            }
+        }
+ 
         const form = document.getElementById('process-form');
         const loadingOverlay = document.getElementById('loading-overlay');
         const mainContent = document.getElementById('main-content');
         const loadingStatus = document.getElementById('loading-status');
         const finalResults = document.getElementById('final-results');
-
+        const progressBar = document.getElementById('progress-bar');
+ 
         form.addEventListener('submit', function(event) {
             event.preventDefault();
-            
+           
+            players.forEach(player => {
+                if (player && typeof player.stopVideo === 'function') {
+                   player.stopVideo();
+                }
+            });
+ 
             loadingOverlay.style.display = 'flex';
             mainContent.style.display = 'none';
-
+ 
             const formData = new FormData(form);
-
+ 
             fetch('/process', {
                 method: 'POST',
                 body: formData
@@ -141,18 +274,29 @@
                 showError('An unexpected error occurred while starting the task.');
             });
         });
-
+ 
         function pollTaskStatus(taskId) {
             const interval = setInterval(() => {
                 fetch(`/status/${taskId}`)
                     .then(response => response.json())
                     .then(data => {
                         if (data.state === 'PROGRESS') {
-                            loadingStatus.textContent = data.status;
+                            const statusText = data.status || '';
+                            loadingStatus.textContent = statusText.replace(/\(\d+%\)/, '').trim();
+                            const percentMatch = statusText.match(/\((\d+)%\)/);
+                            if (percentMatch) {
+                                const percent = percentMatch[1];
+                                progressBar.style.width = percent + '%';
+                                progressBar.textContent = percent + '%';
+                            }
                         } else if (data.state === 'SUCCESS') {
                             clearInterval(interval);
-                            loadingStatus.textContent = 'Processing Complete! ✅';
-                            displayResults(data.result.result);
+                            loadingStatus.textContent = 'Processing Complete! Redirecting...';
+                            progressBar.style.width = '100%';
+                            progressBar.textContent = '100%';
+                            setTimeout(() => {
+                                window.location.href = `/results_page/${taskId}`;
+                            }, 1000);
                         } else if (data.state === 'FAILURE') {
                             clearInterval(interval);
                             showError(`Task Failed: ${data.status}`);
@@ -162,35 +306,9 @@
                         clearInterval(interval);
                         showError('Lost connection to the server.');
                     });
-            }, 2500);
+            }, 1500);
         }
-
-        function displayResults(outputFiles) {
-            let html = '<h2>Your Files Are Ready</h2>';
-            
-            if (outputFiles.video && outputFiles.video.length > 0) {
-                html += '<h3>Video Files (MP4)</h3>';
-                outputFiles.video.forEach(file => {
-                    html += `<a href="/results/${file}" download>${file}</a>`;
-                });
-            }
-            if (outputFiles.audio && outputFiles.audio.length > 0) {
-                html += '<h3>Audio Files (MP3)</h3>';
-                outputFiles.audio.forEach(file => {
-                    html += `<a href="/results/${file}" download>${file}</a>`;
-                });
-            }
-            if (outputFiles.text && outputFiles.text.length > 0) {
-                html += '<h3>Transcription Files (TXT)</h3>';
-                outputFiles.text.forEach(file => {
-                    html += `<a href="/results/${file}" download>${file}</a>`;
-                });
-            }
-
-            html += '<hr style="margin-top: 2rem;"><a href="/" style="background: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">Process another video</a>';
-            finalResults.innerHTML = html;
-        }
-
+       
         function showError(message) {
             loadingStatus.textContent = 'Error! ❌';
             finalResults.innerHTML = `<p style="color:#ffcdd2;">${message}</p><a href="/">Please try again</a>`;

@@ -3,65 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Video</title>
+    <title>Video Splitter</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; color: #333; max-width: 800px; margin: 2rem auto; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
-        h1 { color: #555; }
-        form { background: #fff; padding: 2rem; border-radius: 5px; }
-        input[type=file], input[type=url], input[type=number] { width: 95%; padding: 10px; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; }
-        input[type=submit] { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
-        .flashes { list-style: none; padding: 0; }
-        .flashes li { background: #ffcdd2; color: #c62828; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; border-left: 5px solid #c62828; }
-        #loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.7); color: white;
-            display: none; justify-content: center; align-items: center; text-align: center; z-index: 1000;
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --light-gray: #f8f9fa;
+            --border-color: #dee2e6;
+            --text-color: #343a40;
+            --card-shadow: 0 4px 8px rgba(0,0,0,0.05);
         }
-        #loading-overlay h2 { color: white; font-size: 2rem; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+        }
+        .main-container { max-width: 900px; margin: auto; }
+        h1 { text-align: center; margin-bottom: 2rem; }
+        .card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+        .card-header { background-color: var(--light-gray); padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .card-header h2 { margin: 0; font-size: 1.2rem; }
+        .card-body { padding: 1.5rem; }
+        
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+        }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-secondary { background-color: var(--secondary-color); color: white; }
+
+        .input-group { display: flex; gap: 10px; }
+        .input-group .form-control { flex-grow: 1; }
+        
+        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; }
+        .video-card { border: 1px solid var(--border-color); border-radius: 8px; text-align: center; box-shadow: var(--card-shadow); }
+        .video-card img { max-width: 100%; border-radius: 8px 8px 0 0; }
+        .video-card .title { font-size: 0.9em; padding: 0.75rem; min-height: 40px; }
+        .video-card .btn-secondary { width: calc(100% - 2rem); margin: 0 1rem 1rem 1rem; }
+
+        .flashes { list-style: none; padding: 0; margin: 0 0 2rem 0; }
+        .flashes li { padding: 1rem; margin-bottom: 1rem; border-radius: 4px; border-left: 5px solid; }
+        .flashes .error { background: #ffcdd2; color: #c62828; border-color: #c62828; }
+        .flashes .success { background: #d4edda; color: #155724; border-color: #155724; }
+        
+        /* --- CORRECTED STYLES for the loading overlay --- */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            color: white;
+            display: none; /* Changed to none, will be activated by JS */
+            place-items: center; /* Modern way to center content */
+            z-index: 1000;
+        }
+        #loading-overlay .content {
+            text-align: center;
+        }
+        #loading-overlay h2 {
+            color: white;
+            font-size: 2rem;
+        }
     </style>
 </head>
 <body>
     <div id="loading-overlay">
-        <div>
+        <div class="content">
             <h2>Downloading & Analyzing Video...</h2>
-            <p>This may take a moment. Please do not close this window.</p>
+            <p>Please do not close this window.</p>
         </div>
     </div>
 
-    <div id="main-content">
+    <div id="main-content" class="main-container">
         <h1>Video Splitter</h1>
-        <p>Upload a video or provide a URL. The app will scan for views matching your template image.</p>
         
         {% with messages = get_flashed_messages() %}
           {% if messages %}
             <ul class=flashes>
             {% for message in messages %}
-              <li>{{ message }}</li>
+              <li class="success">{{ message }}</li>
             {% endfor %}
             </ul>
           {% endif %}
         {% endwith %}
+        
+        <form method="post" enctype="multipart/form-data" id="main-form" action="/">
+            <div class="card">
+                <div class="card-header"><h2>Saved YouTube Channel</h2></div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="url" name="channel_url" id="channel-url-input" class="form-control" value="{{ saved_channel_url }}" placeholder="Paste YouTube channel URL">
+                        <button type="submit" class="btn btn-secondary" form="channel-form">Save</button>
+                    </div>
+                    
+                    {% if latest_videos %}
+                        <h3 style="margin-top: 2rem;">Last 3 Completed Live Streams</h3>
+                        <div class="video-grid">
+                            {% for video in latest_videos %}
+                            <div class="video-card">
+                                <img src="{{ video.thumbnail }}" alt="{{ video.title }}">
+                                <div class="title">{{ video.title }}</div>
+                                <button type="button" class="btn btn-secondary select-button" data-url="{{ video.url }}">Select</button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% elif saved_channel_url %}
+                        <p style="text-align: center; margin-top: 1rem;">Could not find recent completed live videos.</p>
+                    {% endif %}
+                </div>
+            </div>
 
-        <form method=post enctype=multipart/form-data id="upload-form">
-            <h2>Option 1: Upload a Video File</h2>
-            <input type=file name=file>
-
-            <h2>Option 2: Paste a Video URL</h2>
-            <input type=url name=url placeholder="https://www.youtube.com/watch?v=...">
-            
-            <hr>
-            
-            <label for="sensitivity">Feature Match Sensitivity (60=loose, 160=strict, 200=max):</label>
-            <input type="number" name="sensitivity" value="80" min="60" max="200" style="width: 100px;">
-            <br><br>
-            <input type=submit value="Analyze Video">
+            <div class="card">
+                <div class="card-header"><h2>Manual Processing</h2></div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Upload a Video File</label>
+                        <input type=file name=file class="form-control">
+                    </div>
+                    <p style="text-align: center; font-weight: bold;">OR</p>
+                    <div class="form-group">
+                        <label>Paste a Video URL</label>
+                        <input type=url name=url id="manual-url-input" class="form-control" placeholder="YouTube, Facebook, etc.">
+                    </div>
+                    <hr style="border: 0; height: 1px; background: #ddd; margin: 2rem 0;">
+                    <div class="form-group">
+                        <label for="sensitivity">Feature Match Sensitivity (70=loose, 160=strict):</label>
+                        <input type="number" name="sensitivity" value="100" min="70" max="200" class="form-control" style="width: 120px;">
+                    </div>
+                    <input type="submit" value="Analyze Video" class="btn btn-primary" style="width: 100%;">
+                </div>
+            </div>
         </form>
+
+        <form action="/save_channel" method="post" id="channel-form" style="display: none;"></form>
     </div>
     
     <script>
-        document.getElementById('upload-form').addEventListener('submit', function() {
-            document.getElementById('loading-overlay').style.display = 'flex';
+        const mainForm = document.getElementById('main-form');
+        const channelForm = document.getElementById('channel-form');
+        const manualUrlInput = document.getElementById('manual-url-input');
+        const channelUrlInput = document.getElementById('channel-url-input');
+
+        function showLoading() {
+            // Set display to 'grid' for modern centering
+            document.getElementById('loading-overlay').style.display = 'grid';
             document.getElementById('main-content').style.display = 'none';
+        }
+
+        mainForm.addEventListener('submit', showLoading);
+        channelForm.addEventListener('submit', showLoading);
+        
+        document.querySelectorAll('.select-button').forEach(button => {
+            button.addEventListener('click', function() {
+                manualUrlInput.value = this.dataset.url;
+                mainForm.submit();
+            });
+        });
+
+        channelForm.addEventListener('submit', function() {
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'channel_url';
+            hiddenInput.value = channelUrlInput.value;
+            this.appendChild(hiddenInput);
         });
     </script>
 </body>
